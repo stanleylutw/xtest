@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>弋揚硬體測試介面 - V97_1211</title>
+<!--
+【弋揚硬體測試介面 v82_test5_1127 測試版 Release Notes】
+
+一、介面統一
+1. Index / J1939 / GPS 三頁統一採用 J1939 風格 Header（含背景圖與版心寬度）。
+2. 首頁改為卡片式入口設計，分別導向 J1939、GPS 測試頁，方便工程測試快速切換。
+
+二、版本統一與清理
+1. 移除所有舊版顯示文字（包含早期 v77_1126、v79_testXX_1126 等標示）。
+2. 所有頁面內部版本標示統一為 v80_1126，包含標題列與 Header 內的版本膠囊。
+
+三、程式架構調整
+1. JavaScript 結構採用 app.js + j1939.js + gps.js 拆分：
+   - app.js：放置共用工具與初始化流程（如版本顯示、共用 UI 行為等）。
+   - j1939.js：處理 J1939 / CAN / Serial 相關邏輯與 DEMO 功能。
+   - gps.js：處理 GPS / NMEA / Leaflet 地圖與 Playback / ALL 模式繪製。
+2. 共用工具函式已從個別頁面抽離，統一集中於 app.js，方便後續維護與擴充。
+
+四、連結與導覽修正
+1. 首頁兩顆按鈕分別正確連結至 j1939_v82_1127.html、gps_v82_1127.html。
+2. J1939 / GPS 頁「返回首頁」皆指向 index_v82_1127.html，提升導覽一致性。
+
+本版為 2025/11/26 正式發布，供內部 FMS / J1939 / GPS 測試使用。
+-->
+<style>
+    :root{
+      --bg-page:#f3f4f6;
+      --bg-header:#ffffff; /* header white */
+      --bg-card:#ffffff;
+      --primary:#2563eb;
+      --text-main:#111827;
+      --text-muted:#6b7280;
+      --border-subtle:#e5e7eb;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+      background:var(--bg-page);
+      color:var(--text-main);
+    }
+    a{text-decoration:none;color:inherit;}
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    .layout{
+      max-width:90%;
+      margin:24px auto;
+      padding:0 16px 32px;
+    }
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+      gap:18px;
+    }
+    .card{
+      background:var(--bg-card);
+      border-radius:16px;
+      border:1px solid var(--border-subtle);
+      padding:18px 18px 16px;
+      box-shadow:0 10px 25px rgba(0,0,0,.05);
+    }
+    .card h2{
+      margin:0 0 8px;
+      font-size:18px;
+      font-weight:700;
+    }
+    .card p{
+      margin:0 0 14px;
+      font-size:13px;
+      color:var(--text-muted);
+      line-height:1.5;
+    }
+    .card-footer{
+      display:flex;
+      justify-content:flex-end;
+    }
+    .btn-open{
+      display:inline-block;
+      padding:7px 14px;
+      border-radius:999px;
+      border:1px solid var(--primary);
+      background:var(--primary);
+      color:#ffffff;
+      font-size:13px;
+    }
+    .btn-open:hover{
+      background:#1d4ed8;
+      border-color:#1d4ed8;
+    }
+    @media(max-width:600px){
+      
+      
+    }
+  
+
+    /* J1939/GPS header style */
+.app-header{
+      background:white;
+      padding:2px 18px;
+    }
+    .app-header-inner{
+      max-width:90%;
+      margin:auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    
+    }
+    .app-logo-title{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .app-logo{ height:56px; width:auto; }
+    .app-title{
+      font-size:20px;
+      font-weight:700;
+      color:#b91c1c;
+    }
+
+    
+
+    /* RN modal (Release Notes) */
+    .ver-modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(15,23,42,0.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+    }
+    .ver-modal{
+      background:#ffffff;
+      border-radius:16px;
+      max-width:720px;
+      width:92%;
+      max-height:80vh;
+      box-shadow:0 24px 60px rgba(15,23,42,0.45);
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+    .ver-modal-header{
+      padding:2px 18px;
+      border-bottom:1px solid var(--border-subtle,#e5e7eb);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .ver-modal-title{
+      font-size:15px;
+      font-weight:700;
+      color:#111827;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .ver-modal-title-emoji{
+      font-size:18px;
+    }
+    .ver-modal-close{
+      border:none;
+      background:transparent;
+      cursor:pointer;
+      font-size:18px;
+      color:#6b7280;
+      padding:4px;
+      border-radius:999px;
+    }
+    .ver-modal-close:hover{
+      background:rgba(148,163,184,0.18);
+    }
+    .ver-modal-body{
+      padding:12px 18px 14px;
+      font-size:13px;
+      color:#111827;
+      overflow-y:auto;
+    }
+    .ver-version{
+      margin-bottom:12px;
+    }
+    .ver-tag{
+      display:inline-block;
+      padding:3px 9px;
+      border-radius:999px;
+      background:#e5e7eb;
+      font-size:12px;
+      font-weight:600;
+      margin-bottom:4px;
+    }
+    .ver-tag.ver-latest{
+      background:#d1fae5;
+      color:#047857;
+    }
+    .ver-version ul{
+      margin:0 0 0 20px;
+      padding:0;
+    }
+    .ver-version li{
+      margin:2px 0;
+      line-height:1.5;
+    }
+    @media (max-width:480px){
+      .ver-modal{
+        width:94%;
+        border-radius:14px;
+      }
+      .ver-modal-body{
+        font-size:12px;
+      }
+    }
+
+
+    .info-btn{
+      width:18px;height:18px; border-radius:999px;
+      border:1px solid var(--border-subtle);
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size:12px; color:var(--text-muted); background:white;
+      cursor:pointer;
+    }
+</style>
+</head>
+<body>
+<header class="app-header">
+<div class="app-header-inner">
+<div class="app-logo-title">
+<a href="index_V97_1211.html"><img alt="EUP Logo" class="app-logo" src="eup-logo.png"/></a>
+<div class="app-title">弋揚硬體測試介面<a href="index_V97_1211.html" style="color:white;font-size:13px;border:1px solid #fff;padding:4px 10px;border-radius:8px;text-decoration:none;">返回首頁</a></div>
+</div>
+<div class="page-version" style="display:flex;align-items:center;gap:6px;font-size:14px;color:#9ca3af;font-weight:600;">
+<span id="verLabel">V97_1211</span>
+<span class="info-btn" id="verInfo">i</span>
+</div>
+</div>
+</header>
+<main class="layout">
+<section class="cards">
+<article class="card">
+<h2>J1939 測試介面</h2>
+<p>USB-RS232 / USB-CAN 解析、J1939 DEMO、8 組車輛關鍵參數（速度、轉速、里程、油量等）。</p>
+<div class="card-footer">
+<a class="btn-open" href="j1939_V97_1211.html">開啟 J1939 測試頁</a>
+</div>
+</article>
+<article class="card">
+<h2>GPS 測試介面</h2>
+<p>USB-GPS 即時 NMEA 解析、Raw / Filtered / 15s 軌跡、Playback / ALL 模式繪製。</p>
+<div class="card-footer">
+<a class="btn-open" href="gps_V97_1211.html">開啟 GPS 測試頁</a>
+</div>
+</article>
+</section>
+</main>
+<script src="js/app.js"></script>
+<div class="ver-modal-backdrop" id="verModalBackdrop">
+<div class="ver-modal">
+<div class="ver-modal-header">
+<div class="ver-modal-title">
+<span class="ver-modal-title-emoji">📜</span>
+<span>版本更新紀錄 (Release Notes)</span>
+</div>
+<button aria-label="關閉" class="ver-modal-close" id="verModalCloseBtn" type="button">✕</button>
+</div>
+<div class="ver-modal-body">
+<div class="ver-version"><div class="ver-tag ver-latest">V97_1211（正式版）</div>
+<ul>
+<li>停車演算法升級：以第一個低速點（≤ 3 km/h）作為停車錨點（anchor），同一叢集中錨點保持不變。</li>
+<li>錨點 10 公尺內的點皆視為同一停車叢集，超過 10 公尺即關閉叢集；僅當停車時長 ≥ 20 秒才建立 P 事件。</li>
+<li>導入 P_Locking v1.0：鎖定 P icon 位置與同一停車區間，避免 GPS 漂移產生多個碎片化停車事件。</li>
+<li>Parking v1.3 與 P_Locking v1.0 僅管理 P icon 與停車時間，不影響 Raw / 15s / Filtered / Sharp 等既有軌跡。</li>
+<li>更新「停車」 i-icon 說明，文字與 RN modal 一致，方便回溯演算法規則與版本差異。</li>
+</ul></div>
+<div class="ver-version"><div class="ver-tag">V96_1210（正式版）</div>
+<ul>
+<li>15s / 30s 雙模式取樣，下拉選單可切換 15 秒與 30 秒，ALL 播放時依選項重算 15/30 秒軌跡點數與總距離。</li>
+<li>15/30 秒軌跡線與 chip 圓點改為紅色，急轉向 S 點與圖示改為橘色，與 Raw / Filtered 顏色清楚區隔。</li>
+<li>Data Log 模式下選 ALL 播放時，會先清空舊軌跡並回到檔案第一筆資料，再依 15s/30s 設定重算全程軌跡。</li>
+<li>Filtered 閥值與 15s/30s 自動連動：15 秒對應閥值 100、30 秒對應閥值 200，方便快速切換分析強度。</li>
+<li>修正 15s/30s 點數與播放一致性問題（首次載入與切換後點數不一致、載入新檔案第一次播放仍使用舊設定、15/30 秒軌跡消失等）。</li>
+</ul></div><div class="ver-version"><div class="ver-tag">V95_1208（正式版）</div><ul><li>Filtered 升級為 v2.5：優化 g1～g4 視窗行為，彎道判定失敗時，視窗內點位會回饋至 Cond3 角度累積，避免 heading 資訊被浪費。</li><li>Filtered 閥值下拉選單改為 1～3000 多段選項（預設 100），方便依不同路線調整藍線密度與抽稀強度。</li><li>Filtered 軌跡線改為藍色（Blue），搭配 Raw / 15s / 停車 / 急轉向，讓優化後路線在地圖上更易辨識。</li><li>預設關閉 flt / cand / S 除錯點顯示，只在使用者點擊除錯切換按鈕時才顯示，讓一般使用情境畫面更乾淨。</li></ul></div>><div class="ver-version">
+<div class="ver-tag">V93_1207（正式版）</div>
+<ul>
+<li>三頁 Header 統一採用 GPS 最新樣式（Logo、標題、版本標示與 i 圖示一致），Index / J1939 / GPS 介面風格完全同步。</li>
+<li>Playback 工具列整合為與 COM / DEMO 相同的一行：左側為 COM Port 區塊，中間為播放控制列，右側保留模擬 DEMO 按鈕。</li>
+<li>播放列 UI 精簡：隱藏「總筆數」與 Replay 按鈕，將「載入 GPS Log」文字改為「載入」，並統一按鈕與文字大小，使其風格與上方工具列一致。</li>
+<li>整體版面寬度統一為 90% 視窗寬度（含 Index / J1939 / GPS），確保三頁布局一致且在寬螢幕上有更佳視覺平衡。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">V92_1207（正式版）</div>
+<ul>
+<li>GPS 介面重構：Playback 控制列與 Raw / 15s / Filtered / 停車 / 急轉向 chips 採用地圖上方 overlay 方式呈現，提升可讀性與操作一致性。</li>
+<li>右上功能圖示列：新增 Auto/Manual、日/夜、清除軌跡、全螢幕四個圖示按鈕，統一管理顯示模式與軌跡清除行為。</li>
+<li>Filtered v2.2 整合：更新 gps_V95_1208.js 內 Filtered 演算法邏輯（g1 視窗鎖定＋turnAccSum 閥值累積），延續 Cond1 / Cond3 設計，讓藍線在彎道與長直線段更加穩定。</li>
+<li>Tooltip / i-icon 統一：Filtered / 停車 / 急轉向的說明視窗文字與樣式統一（字級約 11～12px、適度換行），其中 Filtered 「i」 同時包含閥值邏輯說明，不再額外顯示獨立閥值說明按鈕。</li>
+<li>穩定性修正：修正新版 UI 中因元素尚未建立而產生的 addEventListener null 例外，確保在未載入檔案或切換模式時系統不會拋出錯誤。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">V90_1204（正式版）</div>
+<ul>
+<li>導入 Sharp Turn v3.0：整合 candidate / S / flt 三階段掃描與 ALL 播放重算機制，作為急轉向偵測新基準。</li>
+<li>Raw / 15s / Filtered 行為調整：Raw 每秒一點、15 秒軌跡改用 UTC 秒數取樣，Filtered 閥值改為 dropdown，可在 ALL 模式下動態重算藍線。</li>
+<li>GPS 地圖體驗：加入全螢幕模式、ALL 模式結束自動縮放、地圖圖例與 chip 呈現調整，方便一次檢視完整路線。</li>
+<li>RN modal 正式啟用：Index / J1939 / GPS 三頁統一採用 RN modal 顯示版本歷史，並同步 V90 相關演算法與 UI 說明。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">V84_1129（正式版）</div>
+<ul>
+<li>新增急轉向偵測 Sharp Turn v2.3：使用 g1~g4 視窗與同側轉彎條件，在第一個符合條件的視窗於 g3 畫出紅色 S icon。</li>
+<li>停車偵測與時間軸修正：停車判定改以 3 km/h、距離 10m、20 秒與 UTC 秒數時間軸計算，Playback / ALL 模式下結果與舊版一致。</li>
+<li>停車 / 急轉向說明：在 GPS 頁加入 P / S chip 的規則說明與統計資訊，方便對照 log 與 UBI 使用情境。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">v82_1127（正式版）</div>
+<ul>
+<li>統一 Index / J1939 / GPS Header 與版本顯示，改以 RN modal 呈現 Release Notes。</li>
+<li>GPS / J1939 15 秒軌跡改為以 RMC UTC 秒數為主，缺資料時退回 dt 演算法，避免 15s 完全不顯示。</li>
+<li>修正早期版本在 15 秒軌跡與 GNRMC 支援上的括號錯誤與邏輯問題，作為後續版本穩定基礎。</li>
+</ul>
+</div>
+</div
+</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const infoBtn = document.getElementById('verInfo');
+  const backdrop = document.getElementById('verModalBackdrop');
+  const closeBtn = document.getElementById('verModalCloseBtn');
+
+  if(!infoBtn || !backdrop){ return; }
+
+  function openModal(){
+    backdrop.style.display = 'flex';
+  }
+  function closeModal(){
+    backdrop.style.display = 'none';
+  }
+
+  infoBtn.addEventListener('click', openModal);
+  if(closeBtn){
+    closeBtn.addEventListener('click', closeModal);
+  }
+  backdrop.addEventListener('click', function(e){
+    if(e.target === backdrop){ closeModal(); }
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeModal(); }
+  });
+});
+</script>
+</body>
+</html>

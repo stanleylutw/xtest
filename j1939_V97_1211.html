@@ -1,0 +1,959 @@
+<!-- Version: V97_1211_official -->
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<title>弋揚 J1939 測試介面 - V97_1211</title>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<!-- Leaflet (OSM no key) -->
+<link crossorigin="" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" rel="stylesheet"/>
+<script crossorigin="" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --bg-subtle: #f3f4f6;
+      --border-subtle: #e5e7eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --danger: #ef4444;
+      --fix-ok-bg: #ecfdf3;
+      --fix-ok-br: #86efac;
+      --fix-bad-bg:#f3f4f6;
+      --fix-bad-br:#e5e7eb;
+
+      /* Track colors (warm, not harsh) */
+      --raw-red: #d06a5c;      /* warm soft red */
+      --flt-blue: #3b82b1;     /* warm soft blue */
+    }
+
+    body{
+      margin:0;
+      background:var(--bg-subtle);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--text-main);
+    }
+
+    /* HEADER */
+    .app-header{
+      background:white;
+      padding:2px 18px;
+    }
+    .app-header-inner{
+      max-width:90%;
+      margin:auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    
+    }
+    .app-logo-title{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .app-logo{ height:56px; width:auto; }
+    .app-title{
+      font-size:20px;
+      font-weight:700;
+      color:#b91c1c;
+    }
+
+    .layout{
+      max-width:90%;
+      margin:20px auto 32px;
+      padding:0 16px;
+    }
+
+    /* TOOLBAR */
+    .toolbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+    .toolbar-left{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .toolbar-right{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .btn{
+      padding:6px 14px;
+      font-size:13px;
+      border-radius:999px;
+      cursor:pointer;
+      border:1px solid var(--border-subtle);
+      background:white;
+      color:var(--text-main);
+      user-select:none;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+    }
+    .btn-primary{
+      background:var(--primary);
+      color:white;
+      border-color:var(--primary-dark);
+    }
+    .btn-outline{
+      background:white;
+      color:var(--text-muted);
+    }
+    .btn-ghost{ background:#f3f4f6; }
+    .btn-ghost.active{
+      background:#fde68a;
+      border-color:#facc15;
+      color:#854d0e;
+    }
+    .btn-clear{
+      background:#fee2e2;
+      color:#b91c1c;
+      border-color:#fca5a5;
+    }
+    .btn:disabled{ opacity:.6; cursor:not-allowed; }
+
+    .status-chip{
+      font-size:12px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--border-subtle);
+      background:white;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .status-dot{
+      width:8px;height:8px;border-radius:999px;background:#9ca3af;
+    }
+    .status-dot.connected{ background:#22c55e; }
+
+    .mode-switch{
+      padding:4px 10px;
+      border:1px solid var(--border-subtle);
+      border-radius:999px;
+      background:white;
+      font-size:12px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .mode-switch label{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+    }
+    .mode-switch input[type="radio"]{ width:12px;height:12px; }
+
+    /* UART settings pills */
+    .uart-select{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--border-subtle);
+      background:white;
+      cursor:pointer;
+    }
+    .uart-label{
+      font-size:12px;
+      color:var(--text-muted);
+      margin-right:2px;
+    }
+    .uart-group{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      flex-wrap:wrap;
+      padding:4px 8px;
+      background:white;
+      border:1px solid var(--border-subtle);
+      border-radius:999px;
+    }
+
+    /* METRICS */
+    .metric-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+      gap:14px;
+      margin-bottom:12px;
+    }
+    .metric-card{
+      background:white;
+      border-radius:14px;
+      padding:14px;
+      border:1px solid var(--border-subtle);
+      transition:background .2s ease,border-color .2s ease;
+    }
+    .metric-card--active{
+      background:#fef9c3;
+      border-color:#facc15;
+    }
+    .metric-card.fix-ok{
+      background:var(--fix-ok-bg);
+      border-color:var(--fix-ok-br);
+    }
+    .metric-card.fix-bad{
+      background:var(--fix-bad-bg);
+      border-color:var(--fix-bad-br);
+    }
+    .metric-header{
+      display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;
+    }
+    .metric-label-row{
+      display:flex; align-items:center; gap:6px;
+    }
+    .mini-needle{
+      width:18px;height:18px;
+      transform-origin:50% 95%;
+      transition:transform .15s ease-out;
+    }
+    .metric-sublabel{ font-size:12px; color:var(--text-muted); }
+    .metric-main{ display:flex; align-items:baseline; gap:6px; }
+    .metric-value{ font-size:26px; font-weight:700; }
+    .metric-unit{ font-size:12px; color:var(--text-muted); }
+    .metric-extra{
+      font-size:12px; color:var(--text-muted); margin-top:4px; line-height:1.4;
+    }
+
+    /* GPS BAR (one-line) */
+    .gps-bar{
+      background:white;
+      border:1px solid var(--border-subtle);
+      border-radius:12px;
+      padding:8px 12px;
+      font-size:12px;
+      color:var(--text-main);
+      display:none;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+    .gps-chip{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:3px 8px; border-radius:999px; background:#f8fafc; border:1px solid #eef2f7;
+      font-size:12px;
+    }
+    .gps-chip.ok{ background:#ecfdf3; border-color:#86efac; }
+    .gps-chip.bad{ background:#f3f4f6; border-color:#e5e7eb; color:#6b7280; }
+    .gps-needle{
+      width:18px;height:18px; transform-origin:50% 95%;
+    }
+
+    /* MAP */
+    .map-wrap{
+      background:white;
+      border-radius:14px;
+      border:1px solid var(--border-subtle);
+      padding:10px;
+      margin-bottom:12px;
+      display:none; /* only show in GPS mode */
+    }
+    .map-toolbar{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:8px;
+      flex-wrap:wrap;
+    }
+    .map-title{
+      font-size:13px;
+      color:var(--text-muted);
+      margin-right:auto;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .track-chip{
+      font-size:12px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--border-subtle);
+      background:#fff;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .track-chip .dot{
+      width:10px;height:10px;border-radius:999px;display:inline-block;
+    }
+    .track-chip.raw .dot{ background:var(--raw-red); }
+    .track-chip.flt .dot{ background:var(--flt-blue); }
+    .track-chip.t15 .dot{ background:#f97316; }
+    .track-chip.off{
+      opacity:.45;
+      text-decoration:line-through;
+    }
+    .info-btn{
+      width:18px;height:18px; border-radius:999px;
+      border:1px solid var(--border-subtle);
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size:12px; color:var(--text-muted); background:white;
+      cursor:pointer;
+    }
+
+    #map{
+      width:100%;
+      height:380px;
+      border-radius:10px;
+      overflow:hidden;
+    }
+    .leaflet-container{ font: inherit; }
+
+    /* custom arrow marker */
+    .arrow-marker{
+      width:18px; height:18px; position:relative;
+      transform-origin:50% 50%;
+    }
+    .arrow-marker::before{
+      content:"";
+      position:absolute; left:50%; top:2px;
+      width:0; height:0;
+      border-left:5px solid transparent;
+      border-right:5px solid transparent;
+      border-bottom:10px solid var(--flt-blue);
+      transform:translateX(-50%);
+    }
+    .arrow-marker::after{
+      content:"";
+      position:absolute; left:50%; top:11px;
+      width:6px; height:6px; background:var(--flt-blue);
+      border-radius:999px; transform:translateX(-50%);
+      box-shadow:0 0 0 2px rgba(59,130,177,.15);
+    }
+    .arrow-marker.gray::before{ border-bottom-color:#9ca3af; }
+    .arrow-marker.gray::after{ background:#9ca3af; box-shadow:none; }
+
+    /* Map legend (bottom right) */
+    .legend-box{
+      position:absolute;
+      right:12px; bottom:12px;
+      background:rgba(255,255,255,.95);
+      border:1px solid var(--border-subtle);
+      border-radius:10px;
+      padding:8px 10px;
+      font-size:12px;
+      display:flex; flex-direction:column; gap:6px;
+      box-shadow:0 4px 10px rgba(0,0,0,.08);
+    }
+    .legend-row{
+      display:flex; align-items:center; gap:6px;
+      color:var(--text-main);
+    }
+    .legend-line{
+      width:18px; height:0; border-top:3px solid;
+      border-radius:2px;
+    }
+    .legend-line.raw{
+      border-top-color:var(--raw-red);
+      border-top-style:dashed;
+    }
+    .legend-line.flt{
+      border-top-color:var(--flt-blue);
+      border-top-style:solid;
+    }
+    .legend-off{ opacity:.45; text-decoration:line-through; }
+
+    /* PLAYBACK BAR */
+    .playback-bar{
+      display:none;
+      background:white;
+      border:1px solid var(--border-subtle);
+      border-radius:12px;
+      padding:8px 10px;
+      margin-bottom:8px;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .playback-bar .btn{ font-size:13px; padding:6px 14px; }
+    .playback-meta{
+      font-size:13px; color:var(--text-muted);
+      margin-right:auto;
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+      padding:6px 14px;
+      border-radius:999px;
+      border:1px solid var(--border-subtle);
+      background:white;
+    }
+    .playback-bar span.playback-meta{ display:none; }
+
+    .status-tech{
+      font-size:12px;
+      color:#4b5563;
+    }
+    .speed-select{
+      font-size:12px; padding:5px 10px; border-radius:999px; border:1px solid var(--border-subtle);
+      background:white;
+    }
+
+    /* LOG */
+    .log-bar{
+      display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;
+    }
+    .log-bar-left{ font-size:12px; color:var(--text-muted); }
+    .log-bar-right{
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; width:100%;
+    }
+    .log-tools-left{
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    }
+    .log-spacer{ flex:1; }
+    #logSize,#exportFormat{ min-width:110px; }
+
+    #log{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--border-subtle);
+      padding:10px;
+      white-space:pre-wrap;
+      overflow-y:auto;
+      font-family:monospace;
+      font-size:12px;
+      background:#050816;
+      color:#e5e7eb;
+      height:230px;
+    }
+    #log.log-can{ background:white !important; color:#111827 !important; }
+
+    #warning{
+      color:var(--danger);
+      font-size:12px;
+      margin-top:6px;
+      display:none;
+    }
+
+    /* MODALS */
+    #formatModal,
+    #ruleModal{
+      position:fixed; inset:0; background:rgba(0,0,0,.45);
+      display:none; justify-content:center; align-items:center; z-index:1000;
+    }
+    #formatModalBox,
+    #ruleModalBox{
+      width:420px; max-width:calc(100% - 40px);
+      background:white; border-radius:12px; padding:16px;
+      box-shadow:0 6px 22px rgba(0,0,0,.18);
+      position:relative; font-size:12px;
+      line-height:1.55;
+    }
+    #formatClose,#ruleClose{
+      position:absolute; right:10px; top:8px; cursor:pointer; color:#6b7280;
+    }
+    #formatModalBox h4,
+    #ruleModalBox h4{ margin:0 0 8px; font-size:14px; }
+    #formatModalBox p,
+    #ruleModalBox p{ margin:8px 0 4px; }
+    #formatModalBox pre{
+      background:#f3f4f6; padding:8px; border-radius:6px;
+      font-size:12px; overflow-x:auto;
+    }
+    #ruleModalBox ul{ margin:6px 0 0 18px; padding:0; }
+
+    @media (max-width:640px){
+      .toolbar{ align-items:flex-start; }
+      .log-bar-right{ margin-left:0; }
+      #map{ height:320px; }
+      .legend-box{ right:8px; bottom:8px; }
+    }
+  
+  .turn-acc-input{width:52px;margin-left:0;padding:2px 4px;border-radius:6px;border:1px solid rgba(0,0,0,0.12);background:#fff;color:#111827;font-size:12px;vertical-align:middle;text-align:center;}
+
+
+  .pt-count{font-size:12px;opacity:0.85;margin-left:4px;}
+
+
+    /* J1939-only page: hide GPS UI components */
+    .gps-bar,
+    .map-wrap,
+    .playback-bar {
+      display: none !important;
+    }
+
+
+    /* RN modal (Release Notes) */
+    .ver-modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(15,23,42,0.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+    }
+    .ver-modal{
+      background:#ffffff;
+      border-radius:16px;
+      max-width:720px;
+      width:92%;
+      max-height:80vh;
+      box-shadow:0 24px 60px rgba(15,23,42,0.45);
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+    .ver-modal-header{
+      padding:2px 18px;
+      border-bottom:1px solid var(--border-subtle,#e5e7eb);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .ver-modal-title{
+      font-size:15px;
+      font-weight:700;
+      color:#111827;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .ver-modal-title-emoji{
+      font-size:18px;
+    }
+    .ver-modal-close{
+      border:none;
+      background:transparent;
+      cursor:pointer;
+      font-size:18px;
+      color:#6b7280;
+      padding:4px;
+      border-radius:999px;
+    }
+    .ver-modal-close:hover{
+      background:rgba(148,163,184,0.18);
+    }
+    .ver-modal-body{
+      padding:12px 18px 14px;
+      font-size:13px;
+      color:#111827;
+      overflow-y:auto;
+    }
+    .ver-version{
+      margin-bottom:12px;
+    }
+    .ver-tag{
+      display:inline-block;
+      padding:3px 9px;
+      border-radius:999px;
+      background:#e5e7eb;
+      font-size:12px;
+      font-weight:600;
+      margin-bottom:4px;
+    }
+    .ver-tag.ver-latest{
+      background:#d1fae5;
+      color:#047857;
+    }
+    .ver-version ul{
+      margin:0 0 0 20px;
+      padding:0;
+    }
+    .ver-version li{
+      margin:2px 0;
+      line-height:1.5;
+    }
+    @media (max-width:480px){
+      .ver-modal{
+        width:94%;
+        border-radius:14px;
+      }
+      .ver-modal-body{
+        font-size:12px;
+      }
+    }
+
+</style>
+</head>
+<body>
+<header class="app-header">
+<div class="app-header-inner">
+<div class="app-logo-title">
+<a href="index_V97_1211.html"><img alt="EUP Logo" class="app-logo" src="eup-logo.png"/></a>
+<div class="app-title">弋揚 J1939 測試介面<a href="index_V97_1211.html" style="color:white;font-size:13px;border:1px solid #fff;padding:4px 10px;border-radius:8px;text-decoration:none;">返回首頁</a>
+</div>
+</div>
+<div class="page-version" style="display:flex;align-items:center;gap:6px;font-size:14px;color:#9ca3af;font-weight:600;">
+<span id="verLabel">V97_1211</span>
+<span class="info-btn" id="verInfo">i</span>
+</div>
+</div>
+</header>
+<main class="layout">
+<!-- Toolbar -->
+<div class="toolbar">
+<div class="toolbar-left">
+<div class="mode-switch">
+<label><input checked="" name="mode" type="radio" value="serial"/> USB-RS232</label>
+<label><input name="mode" type="radio" value="can"/> USB-CAN</label>
+</div>
+<div class="uart-group" id="uartGroup" title="UART 連線參數">
+<span class="uart-label">Baud</span>
+<select class="uart-select" id="baudSelect">
+<option>9600</option><option>19200</option><option>38400</option>
+<option>57600</option><option>115200</option><option>230400</option>
+<option>460800</option><option>921600</option>
+</select>
+<span class="uart-label">Data</span>
+<select class="uart-select" id="dataBitsSelect">
+<option>8</option><option>7</option>
+</select>
+<span class="uart-label">Parity</span>
+<select class="uart-select" id="paritySelect">
+<option selected="" value="none">None</option>
+<option value="even">Even</option>
+<option value="odd">Odd</option>
+</select>
+<span class="uart-label">Stop</span>
+<select class="uart-select" id="stopBitsSelect">
+<option>1</option><option>2</option>
+</select>
+</div>
+<button class="btn btn-primary" id="connectBtn">連接 COM Port</button>
+<button class="btn btn-outline" disabled="" id="disconnectBtn">中斷連線</button>
+<div class="status-chip">
+<span class="status-dot" id="statusDot"></span>
+<span id="statusText">尚未連線</span>
+</div></div>
+<div class="toolbar-right">
+<button class="btn btn-ghost" id="demoBtn">模擬 DEMO</button>
+</div>
+</div>
+<!-- GPS bar (one line) -->
+<div class="gps-bar" id="gpsBar">
+<span class="gps-chip" id="gpsFixChip">定位 <b id="gpsFix">--</b></span>
+<span class="gps-chip">速度 <b id="gpsSpeed">--</b> km/h</span>
+<span class="gps-chip">方位 <b id="gpsCourse">--</b>°</span>
+<span class="gps-chip">海拔 <b id="gpsAlt">--</b> m</span>
+<span class="gps-chip">緯度 <b id="gpsLat">--</b></span>
+<span class="gps-chip">經度 <b id="gpsLon">--</b></span>
+<span class="gps-chip">衛星數 <b id="gpsSats">--</b></span>
+<span class="gps-chip">HDOP <b id="gpsHdop">--</b></span>
+<span class="gps-chip">時間 <b id="gpsUtc">--</b></span>
+<span class="gps-chip">更新 <b id="gpsLocalTs">--</b></span>
+</div>
+<!-- Metrics (8) - for serial/can -->
+<div class="metric-grid" id="metricGrid">
+<div class="metric-card" id="card0">
+<div class="metric-header">
+<div class="metric-label-row">
+<img class="mini-needle" id="needle0" src="data:image/svg+xml;utf8,&lt;svg width='18' height='18' xmlns='http://www.w3.org/2000/svg'&gt;&lt;line x1='9' y1='17' x2='9' y2='2' stroke='red' stroke-width='2' stroke-linecap='round'/&gt;&lt;/svg&gt;"/>
+<span id="label0">速度</span>
+</div>
+<div class="metric-sublabel" id="sub0">PGN 65265 · SPN 84</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value0">--</div>
+<div class="metric-unit" id="unit0">km/h</div>
+</div>
+<div class="metric-extra" id="extra0" style="display:none;"></div>
+</div>
+<div class="metric-card" id="card1">
+<div class="metric-header">
+<div class="metric-label-row">
+<img class="mini-needle" id="needle1" src="data:image/svg+xml;utf8,&lt;svg width='18' height='18' xmlns='http://www.w3.org/2000/svg'&gt;&lt;line x1='9' y1='17' x2='9' y2='2' stroke='red' stroke-width='2' stroke-linecap='round'/&gt;&lt;/svg&gt;"/>
+<span id="label1">轉速</span>
+</div>
+<div class="metric-sublabel" id="sub1">PGN 61444 · SPN 190</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value1">--</div>
+<div class="metric-unit" id="unit1">RPM</div>
+</div>
+<div class="metric-extra" id="extra1" style="display:none;"></div>
+</div>
+<div class="metric-card" id="card2">
+<div class="metric-header">
+<div class="metric-label-row"><span id="label2">里程</span></div>
+<div class="metric-sublabel" id="sub2">PGN 65217</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value2">--</div>
+<div class="metric-unit" id="unit2">km</div>
+</div>
+<div class="metric-extra" id="extra2" style="display:none;"></div>
+</div>
+<div class="metric-card" id="card3">
+<div class="metric-header">
+<div class="metric-label-row"><span id="label3">油量</span></div>
+<div class="metric-sublabel" id="sub3">PGN 65276 · SPN 96</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value3">--</div>
+<div class="metric-unit" id="unit3">%</div>
+</div>
+<div class="metric-extra" id="extra3" style="display:none;"></div>
+</div>
+<div class="metric-card" id="card4">
+<div class="metric-header">
+<div class="metric-label-row"><span id="label4">電壓</span></div>
+<div class="metric-sublabel" id="sub4">PGN 65271 · SPN 168</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value4">--</div>
+<div class="metric-unit" id="unit4">V</div>
+</div>
+<div class="metric-extra" id="extra4" style="display:none;"></div>
+</div>
+<div class="metric-card" id="card5">
+<div class="metric-header">
+<div class="metric-label-row"><span id="label5">水溫</span></div>
+<div class="metric-sublabel" id="sub5">PGN 65262 · SPN 110</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value5">--</div>
+<div class="metric-unit" id="unit5">°C</div>
+</div>
+<div class="metric-extra" id="extra5" style="display:none;"></div>
+</div>
+<div class="metric-card" id="card6">
+<div class="metric-header">
+<div class="metric-label-row"><span id="label6">機油壓</span></div>
+<div class="metric-sublabel" id="sub6">PGN 65263 · SPN 100</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value6">--</div>
+<div class="metric-unit" id="unit6">kPa</div>
+</div>
+<div class="metric-extra" id="extra6" style="display:none;"></div>
+</div>
+<div class="metric-card" id="card7">
+<div class="metric-header">
+<div class="metric-label-row"><span id="label7">油耗率</span></div>
+<div class="metric-sublabel" id="sub7">PGN 65266 · SPN 183</div>
+</div>
+<div class="metric-main">
+<div class="metric-value" id="value7">--</div>
+<div class="metric-unit" id="unit7">L/h</div>
+</div>
+<div class="metric-extra" id="extra7" style="display:none;"></div>
+</div>
+</div>
+<!-- PLAYBACK (GPS log import & replay) -->
+<div class="playback-bar" id="playbackBar">
+<div class="playback-meta" id="playbackMeta">
+<span>檔案：<b id="pbFileName">--</b></span>
+<span>總筆數：<b id="pbTotalRecords">0</b></span>
+<span>總秒數：<b id="pbTotalSeconds">0</b></span>
+</div>
+<input accept=".txt,.csv" id="gpsLogInput" style="display:none;" type="file"/>
+<button class="btn" id="loadGpsLogBtn">載入 GPS Log</button>
+<button class="btn" id="pbToStartBtn">⏮ 重頭</button>
+<button class="btn btn-primary" id="pbPlayBtn">▶ 播放</button>
+<button class="btn" disabled="" id="pbPauseBtn">⏸ 暫停</button>
+<select class="speed-select" id="pbSpeedSelect">
+<option value="1">1x</option>
+<option value="2">2x</option>
+<option value="5">5x</option>
+<option value="10">10x</option>
+<option value="50">50x</option>
+<option value="100">100x</option>
+<option selected="" value="200">200x</option>
+<option value="400">400x</option>
+<option value="800">800x</option>
+<option value="all">All</option>
+</select>
+<button class="btn" id="pbReplayBtn">🔁 Replay</button>
+<span class="playback-meta"><span id="pbProgress">0/0</span><span class="status-tech" id="allStatus"></span></span>
+</div>
+<!-- MAP (GPS only) -->
+<div class="map-wrap" id="mapWrap">
+<div class="map-toolbar">
+<div class="map-title">
+<span class="track-chip raw" id="rawToggle">
+<span class="dot"></span>
+<span>Raw</span>
+<span id="rawKm">0.00 km</span> <span class="pt-count">（<b id="rawPts">0</b> 點）</span>
+</span>
+<span class="info-btn" id="rawInfo" title="Raw 規則">i</span>
+<span class="track-chip t15" id="t15Toggle">
+<span class="dot"></span>
+<span>15s</span>
+<span id="t15Km">0.00 km</span> <span class="pt-count">（<b id="t15Pts">0</b> 點）</span>
+</span>
+<span class="info-btn" id="t15Info" title="15s 規則">i</span>
+<span class="track-chip flt" id="fltToggle">
+<span class="dot"></span>
+<span>Filtered</span>
+<span id="fltKm">0.00 km</span> <span class="pt-count">（<b id="fltPts">0</b> 點）</span>
+</span>
+<span class="info-btn" id="fltInfo" title="Filtered 規則">i</span>
+<span class="track-chip flt" style="background:#f8fafc;border:1px solid #eef2f7;cursor:default;">
+<span style="margin-right:4px;">閥值</span>
+<input class="turn-acc-input" id="turnAccTh" max="800" min="50" step="50" type="number" value="500"/>
+</span>
+</div>
+<button class="btn" id="followToggleBtn">🧲 跟隨/縮放 ON</button>
+<button class="btn" id="darkToggleBtn">🌙 夜間</button>
+<button class="btn btn-clear" id="clearTrackBtn">清除軌跡</button>
+</div>
+<div id="map" style="position:relative;"></div>
+<div id="allOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;justify-content:center;align-items:center;z-index:900;">
+<div id="allOverlayBox" style="background:white;border-radius:12px;padding:16px 20px;box-shadow:0 10px 30px rgba(0,0,0,.25);min-width:260px;max-width:90%;font-size:14px;line-height:1.6;">
+<div id="allOverlayTitle" style="font-weight:600;margin-bottom:6px;">⏳ ALL 模式繪製中</div>
+<div style="margin-bottom:4px;">已處理：<span id="allCountDone">0</span> / <span id="allCountTotal">0</span></div>
+<div>約略完成度：<span id="allPercent">0</span>%</div>
+</div>
+</div>
+</div>
+<!-- Log controls -->
+<div class="log-bar">
+<div class="log-bar-left">接收原始資料（Debug）</div>
+<div class="log-bar-right">
+<div class="log-tools-left">
+<select class="btn" id="logSize">
+<option value="small">視窗大小：小</option>
+<option selected="" value="medium">視窗大小：中</option>
+<option value="large">視窗大小：大</option>
+</select>
+<select class="btn" id="exportFormat">
+<option value="txt">格式：TXT</option>
+<option value="csv">格式：CSV</option>
+</select>
+<button class="btn" id="exportBtn">匯出 Log</button>
+<button class="btn" id="formatInfoBtn">格式說明</button>
+</div>
+<div class="log-spacer"></div>
+<button class="btn btn-clear" id="clearLogBtn">清除 Log</button>
+</div>
+</div>
+<div id="log"></div>
+<div id="warning"></div>
+</main>
+<!-- Format modal -->
+<div id="formatModal">
+<div id="formatModalBox">
+<div id="formatClose">✖</div>
+<h4>格式說明</h4>
+<p><b>USB-RS232 模式：</b></p>
+<pre>SPD=60;RPM=1500;ODO=123456;FUEL=78;VOLT=24.6;TEMP=85;OILP=320;FRATE=18.5\n</pre>
+<p><b>USB-CAN 模式（J1939 RAW frame）：</b></p>
+<pre>18F00400,8,FF,FF,FF,80,3E,FF,FF,FF</pre>
+<p><b>USB-GPS 模式（NMEA 0183）：</b></p>
+<pre>$GNRMC,021334.00,A,2502.3456,N,12130.5678,E,48.0,123.4,120325,,,A*68</pre>
+</div>
+</div>
+<!-- Rule modal -->
+<div id="ruleModal">
+<div id="ruleModalBox">
+<div id="ruleClose">✖</div>
+<h4 id="ruleTitle">規則說明</h4>
+<div id="ruleBody"></div>
+</div>
+</div>
+<script src="js/app.js"></script>
+<script src="js/j1939.js"></script>
+<div class="ver-modal-backdrop" id="verModalBackdrop">
+<div class="ver-modal">
+<div class="ver-modal-header">
+<div class="ver-modal-title">
+<span class="ver-modal-title-emoji">📜</span>
+<span>版本更新紀錄 (Release Notes)</span>
+</div>
+<button aria-label="關閉" class="ver-modal-close" id="verModalCloseBtn" type="button">✕</button>
+</div>
+<div class="ver-modal-body">
+<div class="ver-version"><div class="ver-tag ver-latest">V97_1211（正式版）</div>
+<ul>
+<li>停車演算法升級：以第一個低速點（≤ 3 km/h）作為停車錨點（anchor），同一叢集中錨點保持不變。</li>
+<li>錨點 10 公尺內的點皆視為同一停車叢集，超過 10 公尺即關閉叢集；僅當停車時長 ≥ 20 秒才建立 P 事件。</li>
+<li>導入 P_Locking v1.0：鎖定 P icon 位置與同一停車區間，避免 GPS 漂移產生多個碎片化停車事件。</li>
+<li>Parking v1.3 與 P_Locking v1.0 僅管理 P icon 與停車時間，不影響 Raw / 15s / Filtered / Sharp 等既有軌跡。</li>
+<li>更新「停車」 i-icon 說明，文字與 RN modal 一致，方便回溯演算法規則與版本差異。</li>
+</ul></div>
+<div class="ver-version"><div class="ver-tag">V96_1210（正式版）</div>
+<ul>
+<li>15s / 30s 雙模式取樣，下拉選單可切換 15 秒與 30 秒，ALL 播放時依選項重算 15/30 秒軌跡點數與總距離。</li>
+<li>15/30 秒軌跡線與 chip 圓點改為紅色，急轉向 S 點與圖示改為橘色，與 Raw / Filtered 顏色清楚區隔。</li>
+<li>Data Log 模式下選 ALL 播放時，會先清空舊軌跡並回到檔案第一筆資料，再依 15s/30s 設定重算全程軌跡。</li>
+<li>Filtered 閥值與 15s/30s 自動連動：15 秒對應閥值 100、30 秒對應閥值 200，方便快速切換分析強度。</li>
+<li>修正 15s/30s 點數與播放一致性問題（首次載入與切換後點數不一致、載入新檔案第一次播放仍使用舊設定、15/30 秒軌跡消失等）。</li>
+</ul></div><div class="ver-version"><div class="ver-tag">V95_1208（正式版）</div><ul><li>Filtered 升級為 v2.5：優化 g1～g4 視窗行為，彎道判定失敗時，視窗內點位會回饋至 Cond3 角度累積，避免 heading 資訊被浪費。</li><li>Filtered 閥值下拉選單改為 1～3000 多段選項（預設 100），方便依不同路線調整藍線密度與抽稀強度。</li><li>Filtered 軌跡線改為藍色（Blue），搭配 Raw / 15s / 停車 / 急轉向，讓優化後路線在地圖上更易辨識。</li><li>預設關閉 flt / cand / S 除錯點顯示，只在使用者點擊除錯切換按鈕時才顯示，讓一般使用情境畫面更乾淨。</li></ul></div>><div class="ver-version">
+<div class="ver-tag">V93_1207（正式版）</div>
+<ul>
+<li>三頁 Header 統一採用 GPS 最新樣式（Logo、標題、版本標示與 i 圖示一致），Index / J1939 / GPS 介面風格完全同步。</li>
+<li>Playback 工具列整合為與 COM / DEMO 相同的一行：左側為 COM Port 區塊，中間為播放控制列，右側保留模擬 DEMO 按鈕。</li>
+<li>播放列 UI 精簡：隱藏「總筆數」與 Replay 按鈕，將「載入 GPS Log」文字改為「載入」，並統一按鈕與文字大小，使其風格與上方工具列一致。</li>
+<li>整體版面寬度統一為 90% 視窗寬度（含 Index / J1939 / GPS），確保三頁布局一致且在寬螢幕上有更佳視覺平衡。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">V92_1207（正式版）</div>
+<ul>
+<li>GPS 介面重構：Playback 控制列與 Raw / 15s / Filtered / 停車 / 急轉向 chips 採用地圖上方 overlay 方式呈現，提升可讀性與操作一致性。</li>
+<li>右上功能圖示列：新增 Auto/Manual、日/夜、清除軌跡、全螢幕四個圖示按鈕，統一管理顯示模式與軌跡清除行為。</li>
+<li>Filtered v2.2 整合：更新 gps_V95_1208.js 內 Filtered 演算法邏輯（g1 視窗鎖定＋turnAccSum 閥值累積），延續 Cond1 / Cond3 設計，讓藍線在彎道與長直線段更加穩定。</li>
+<li>Tooltip / i-icon 統一：Filtered / 停車 / 急轉向的說明視窗文字與樣式統一（字級約 11～12px、適度換行），其中 Filtered 「i」 同時包含閥值邏輯說明，不再額外顯示獨立閥值說明按鈕。</li>
+<li>穩定性修正：修正新版 UI 中因元素尚未建立而產生的 addEventListener null 例外，確保在未載入檔案或切換模式時系統不會拋出錯誤。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">V90_1204（正式版）</div>
+<ul>
+<li>導入 Sharp Turn v3.0：整合 candidate / S / flt 三階段掃描與 ALL 播放重算機制，作為急轉向偵測新基準。</li>
+<li>Raw / 15s / Filtered 行為調整：Raw 每秒一點、15 秒軌跡改用 UTC 秒數取樣，Filtered 閥值改為 dropdown，可在 ALL 模式下動態重算藍線。</li>
+<li>GPS 地圖體驗：加入全螢幕模式、ALL 模式結束自動縮放、地圖圖例與 chip 呈現調整，方便一次檢視完整路線。</li>
+<li>RN modal 正式啟用：Index / J1939 / GPS 三頁統一採用 RN modal 顯示版本歷史，並同步 V90 相關演算法與 UI 說明。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">V84_1129（正式版）</div>
+<ul>
+<li>新增急轉向偵測 Sharp Turn v2.3：使用 g1~g4 視窗與同側轉彎條件，在第一個符合條件的視窗於 g3 畫出紅色 S icon。</li>
+<li>停車偵測與時間軸修正：停車判定改以 3 km/h、距離 10m、20 秒與 UTC 秒數時間軸計算，Playback / ALL 模式下結果與舊版一致。</li>
+<li>停車 / 急轉向說明：在 GPS 頁加入 P / S chip 的規則說明與統計資訊，方便對照 log 與 UBI 使用情境。</li>
+</ul>
+</div>
+<div class="ver-version">
+<div class="ver-tag">v82_1127（正式版）</div>
+<ul>
+<li>統一 Index / J1939 / GPS Header 與版本顯示，改以 RN modal 呈現 Release Notes。</li>
+<li>GPS / J1939 15 秒軌跡改為以 RMC UTC 秒數為主，缺資料時退回 dt 演算法，避免 15s 完全不顯示。</li>
+<li>修正早期版本在 15 秒軌跡與 GNRMC 支援上的括號錯誤與邏輯問題，作為後續版本穩定基礎。</li>
+</ul>
+</div>
+</div
+</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const infoBtn = document.getElementById('verInfo');
+  const backdrop = document.getElementById('verModalBackdrop');
+  const closeBtn = document.getElementById('verModalCloseBtn');
+
+  if(!infoBtn || !backdrop){ return; }
+
+  function openModal(){
+    backdrop.style.display = 'flex';
+  }
+  function closeModal(){
+    backdrop.style.display = 'none';
+  }
+
+  infoBtn.addEventListener('click', openModal);
+  if(closeBtn){
+    closeBtn.addEventListener('click', closeModal);
+  }
+  backdrop.addEventListener('click', function(e){
+    if(e.target === backdrop){ closeModal(); }
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeModal(); }
+  });
+});
+</script>
+</body>
+</html>
