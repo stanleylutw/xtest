@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G-BLE Excavator v13.31 (High Performance)</title>
+  <style>
+    /* --- STYLE SYSTEM --- */
+    :root {
+        --primary: #4f46e5; --danger: #ef4444; --bg: #f3f4f6; --border: #e5e7eb;
+        --text: #111827; --muted: #6b7280; --card-bg: #ffffff; --blink-speed: 1s;
+    }
+    body { margin: 0; background-color: var(--bg); font-family: "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+    
+    /* HEADER */
+    .app-header { background: white; padding: 2px 18px; border-bottom: 1px solid var(--border); height: 60px; box-sizing: border-box; flex-shrink: 0; }
+    .app-header-inner { max-width: 95%; margin: auto; display: flex; align-items: center; justify-content: space-between; height: 100%; }
+    .app-logo { height: 48px; width: auto; display: block; }
+    .app-title { font-size: 20px; font-weight: 700; color: #b91c1c; }
+
+    .layout { flex: 1; padding: 20px; display: grid; grid-template-columns: 2fr 1fr; gap: 20px; overflow: hidden; max-width: 1400px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+
+    .card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; padding: 20px; position: relative; }
+    .card-title { font-size: 14px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+    .vis-container { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #fff; overflow: hidden; border-radius: 8px; position: relative; }
+    .controls-stack { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+
+    /* --- HUD STYLE --- */
+    .hud-container { position: absolute; top: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 30px; z-index: 10; pointer-events: none; }
+    .hud-circle { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 10px solid; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    .circle-sm { width: 140px; height: 140px; }
+    .circle-md { width: 180px; height: 180px; }
+
+    /* Themes */
+    .theme-gray { border-color: rgba(229, 231, 235, 0.6); color: #6b7280; }
+    .theme-green { border-color: rgba(34, 197, 94, 0.5); color: #15803d; box-shadow: 0 0 15px rgba(34, 197, 94, 0.2); }
+    .theme-blue { border-color: rgba(59, 130, 246, 0.3); color: #1e40af; }
+    
+    /* Animations */
+    .pulse-border { animation: pulseBlueHybrid 2s infinite; }
+    @keyframes pulseBlueHybrid {
+        0% { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+        50% { border-color: rgba(59, 130, 246, 0.5); }
+        70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+        100% { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+
+    /* Counter Pop */
+    @keyframes countPop { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: #3b82f6; text-shadow: 0 0 15px rgba(59, 130, 246, 0.6); } 100% { transform: scale(1); color: #1e40af; } }
+    .pop-active { animation: countPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+    /* Fan Animation */
+    .fan-blades { transform-origin: center; transform-box: fill-box; }
+    .spin-fan .fan-blades { animation: spinFan 0.6s linear infinite; fill: #f97316; }
+    @keyframes spinFan { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .hud-circle.impact { border-color: rgba(239, 68, 68, 0.6) !important; background: #fef2f2 !important; box-shadow: 0 0 40px rgba(239, 68, 68, 0.6) !important; animation: shakeStatic 0.5s cubic-bezier(.36,.07,.19,.97) both infinite !important; }
+    @keyframes shakeStatic { 10%, 90% { transform: translateX(-4px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
+
+    /* Typography */
+    .c-label { font-size: 16px; font-weight: 800; opacity: 0.7; margin-bottom: 4px; letter-spacing: 0.5px; }
+    .c-value { font-size: 32px; font-weight: 900; line-height: 1; margin-bottom: 2px; }
+    .c-value-lg { font-size: 48px; font-weight: 900; line-height: 1; margin-bottom: 2px; transform-origin: center center; display: inline-block; }
+    .c-sub { font-family: 'Courier New', monospace; font-size: 14px; font-weight: 700; margin-top: 4px; color: #555; }
+    .c-status { font-size: 13px; font-weight: 800; background: #f3f4f6; padding: 4px 10px; border-radius: 12px; margin-top: 6px; }
+
+    .h-soft { color: #f97316; border-color: rgba(249, 115, 22, 0.4) !important; }
+    .h-normal { color: #c2410c; border-color: rgba(194, 65, 12, 0.4) !important; }
+    .h-hard { color: #7c2d12; border-color: rgba(124, 45, 18, 0.4) !important; }
+    .h-extreme { color: #451a03; border-color: rgba(69, 26, 3, 0.4) !important; }
+
+    .imp-badge { position: absolute; top: 5px; right: 5px; background: #ef4444; color: white; font-size: 12px; font-weight: 900; padding: 4px 8px; border-radius: 12px; border: 2px solid white; opacity: 0; transition: 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 2px 5px rgba(0,0,0,0.2); transform: scale(0.8); }
+    .imp-badge.show { opacity: 1; transform: scale(1.2); }
+
+    #alertBanner { position: absolute; top: 220px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; opacity: 0; pointer-events: none; transition: 0.2s; z-index: 11; box-shadow: 0 4px 10px rgba(239,68,68,0.3); }
+    #alertBanner.show { opacity: 1; }
+
+    /* SVG PERFORMANCE OPTIMIZATION */
+    svg {
+        width: 100%; flex: 1; max-height: 400px; margin-top: 200px; z-index: 1;
+        /* Hint to browser for optimization */
+        shape-rendering: geometricPrecision;
+    }
+    #threshCanvas { width: 100%; height: 30px; border-top: 1px solid #eee; background: #fafafa; flex-shrink: 0; z-index: 2; }
+    #waveCanvas { width: 100%; height: 80px; border-top: 1px solid #e5e7eb; background: #fff; flex-shrink: 0; z-index: 2; }
+    
+    /* === GPU ACCELERATION === */
+    .excavator-part {
+        /* Reduced from 0.05s to 0.03s for snappier feel */
+        transition: transform 0.03s linear;
+        /* Promote to GPU layer */
+        will-change: transform;
+    }
+
+    .btn { padding: 10px; border-radius: 6px; cursor: pointer; border: none; font-weight: 600; background: #e5e7eb; width: 100%; font-size: 14px; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .custom-select { padding: 8px; border-radius: 6px; border: 1px solid var(--border); width: 100%; font-weight: bold; font-size: 13px; }
+    .data-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; font-weight: 600; color:#555; }
+    .thresh-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+    .thresh-label { font-size: 13px; font-weight: bold; width: 40px; text-align: right; }
+    
+    .status-led { transition: fill 0.2s; stroke: #333; stroke-width: 2px; }
+    .led-on { fill: #22c55e; filter: drop-shadow(0 0 5px #22c55e); animation: blink 1s infinite; }
+    .led-off { fill: #fff; stroke: none; fill: #9ca3af; }
+    @keyframes blink { 50% { opacity: 0.5; } }
+    .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; }
+    .bg-green { background: #dcfce7; color: #166534; } .bg-gray { background: #f3f4f6; color: #4b5563; } .bg-yellow { background: #fef9c3; color: #854d0e; }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img class="app-logo" src="eup-logo.png" alt="Logo" onerror="this.style.display='none'">
+        <span class="app-title">G-BLE 挖土機測試介面</span>
+      </div>
+      <div style="color:var(--muted); font-size:12px; font-weight:600;">v.g.13.31_PerfFix</div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="vis-container">
+        
+        <div class="hud-container">
+            <div id="cStatus" class="hud-circle circle-sm theme-gray">
+                <div class="c-label">運轉狀態</div>
+                <div id="txtStatus" class="c-status">靜止</div>
+                <div id="timerMov" class="c-sub">00:00</div>
+            </div>
+            <div id="cProd" class="hud-circle circle-md theme-gray" style="position:relative;">
+                <div id="badgeImp" class="imp-badge">撞擊: 0</div>
+                <div class="c-label">挖掘次數</div>
+                <div class="c-value-lg"><span id="txtCount" style="display:inline-block;">0</span></div>
+                <div id="timerWork" class="c-sub">00:00</div>
+            </div>
+            <div id="cHard" class="hud-circle circle-sm theme-gray">
+                <div class="c-label">地質硬度</div>
+                <div id="txtEffort" class="c-value">0%</div>
+                <div id="txtHardness" class="c-status">待機</div>
+            </div>
+        </div>
+        <div id="alertBanner">偵測到撞擊!</div>
+
+        <svg viewBox="-67 93 400 300">
+            
+            <line x1="-200" y1="380" x2="1000" y2="380" stroke="#555" stroke-width="6" stroke-linecap="round"/>
+            
+            <g id="base" transform="translate(100, 290)">
+                <rect x="-30" y="55" width="220" height="40" rx="10" fill="#333" />
+                
+                <path d="M-10,0 L170,0 L170,55 L-10,55 Z" fill="#e67e22" stroke="#333" stroke-width="2"/>
+                <path d="M120,0 L160,0 L155,-45 L120,-45 Z" fill="#555" stroke="#333" stroke-width="2"/>
+
+                <g id="engineFan" transform="translate(15, 30)">
+                    <circle cx="0" cy="0" r="14" fill="#333" stroke="#222" stroke-width="2"/>
+                    <g class="fan-blades" fill="#777">
+                        <path d="M0,0 L-5,-12 Q0,-16 5,-12 Z" />
+                        <path d="M0,0 L12,5 Q16,0 12,-5 Z" />
+                        <path d="M0,0 L-5,12 Q0,16 5,12 Z" />
+                        <path d="M0,0 L-12,-5 Q-16,0 -12,5 Z" />
+                    </g>
+                    <circle cx="0" cy="0" r="3" fill="#aaa"/>
+                </g>
+            </g>
+            <g id="boom" class="excavator-part" transform="translate(200, 300) rotate(-90)">
+                <path d="M-20,15 L140,-140 L160,-120 L0,35 Z" fill="#e67e22" stroke="#333" stroke-width="2" stroke-linejoin="round"/>
+                <circle id="ledBoom" cx="0" cy="0" r="10" class="status-led led-off"/>
+                <g id="stick" class="excavator-part" transform="translate(140, -130) rotate(135)">
+                    <rect x="-15" y="-15" width="30" height="150" rx="5" fill="#e67e22" stroke="#333" stroke-width="2"/>
+                    <circle id="ledStick" cx="0" cy="0" r="8" class="status-led led-off"/>
+                    <g id="bucket" transform="translate(0, 120) rotate(-45)">
+                        <path d="M-25,0 Q-30,40 0,60 Q30,40 25,0 Z" fill="#333" stroke="#222" stroke-width="2"/>
+                        <circle cx="0" cy="0" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+                    </g>
+                </g>
+            </g>
+        </svg>
+        
+        <canvas id="threshCanvas"></canvas>
+        <canvas id="waveCanvas"></canvas>
+      </div>
+      <div style="padding:5px; text-align:center; font-size:12px; color:var(--muted); font-weight:bold; background:#f9fafb; border-top:1px solid #eee;">
+        校正值: 大臂 <span id="offB">-90</span> | 小臂 <span id="offS">135</span> | 平均震動: <span id="avgVibVal">0.000</span>G
+      </div>
+    </div>
+
+    <div class="controls-stack">
+      <div class="card">
+        <div class="card-title">連線設定</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+          <span style="font-size:13px; font-weight:bold;">狀態</span>
+          <span id="connBadge" class="status-badge bg-gray">未連線</span>
+        </div>
+        <button id="connectBtn" class="btn btn-primary">掃描並連線</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">數據監控</div>
+        <div style="margin-bottom:10px;">
+          <select id="controlTarget" class="custom-select">
+            <option value="boom">模式 1: 大臂 (Boom)</option>
+            <option value="stick">模式 2: 小臂 (Stick)</option>
+          </select>
+        </div>
+        <div class="data-row"><span>大臂角度</span><span id="valBoom">-90.0°</span></div>
+        <div class="data-row"><span>小臂角度</span><span id="valStick">135.0°</span></div>
+        <div class="data-row"><span>震動合力</span><span id="valTotalG" style="color:#000">1.000G</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">閾值設定</div>
+        <div class="thresh-row"><span class="thresh-label">動作</span><select id="actThresh" class="custom-select"></select></div>
+        <div class="thresh-row"><span class="thresh-label">重置</span><select id="resThresh" class="custom-select"></select></div>
+        <div class="thresh-row"><span class="thresh-label" style="color:#1d4ed8">移動</span><select id="movThresh" class="custom-select"></select></div>
+        <div class="thresh-row"><span class="thresh-label" style="color:#ef4444">撞擊</span><select id="impThresh" class="custom-select"></select></div>
+        
+        <div style="margin: 10px 0; border-top:1px dashed #eee;"></div>
+        
+        <div class="thresh-row">
+            <span class="thresh-label" style="color:#555;">時間</span>
+            <select id="timeScale" class="custom-select">
+                <option value="5000">5 秒</option>
+                <option value="10000">10 秒</option>
+                <option value="20000">20 秒</option>
+                <option value="30000" selected>30 秒 (預設)</option>
+                <option value="60000">60 秒</option>
+            </select>
+        </div>
+
+        <div class="thresh-row">
+            <span class="thresh-label" style="color:#555;">波形</span>
+            <select id="waveType" class="custom-select">
+                <option value="all">完整 (細節)</option>
+                <option value="simple" selected>簡化 (脈衝)</option>
+            </select>
+        </div>
+
+        <div style="text-align:center; margin-top:10px;">
+             <span id="counterState" class="status-badge bg-gray">關閉</span>
+             <span id="deltaDisplay" class="status-badge bg-blue" style="margin-left:5px;">Δ: 0°</span>
+        </div>
+      </div>
+      <div class="card"><button id="calibrateBtn" class="btn">按住校正歸零</button></div>
+    </div>
+  </div>
+
+<script>
+    const SERVICE_UUID = "550e8400-e29b-41d4-a716-446655440000";
+    const CHAR_UUID    = "550e8400-e29b-41d4-a716-446655440001";
+    
+    // Config
+    const BOOM_PIVOT_X = 200; const BOOM_PIVOT_Y = 300;
+    const STICK_PIVOT_X = 140; const STICK_PIVOT_Y = -130;
+    const TARGET_BOOM = -90; const TARGET_STICK = 135;
+    
+    const AVG_WINDOW_MS = 3000;
+    const QUICK_STOP_MS = 3000;
+    const VIB_IDLE_TH = 0.05;
+    const NOISE_FLOOR = 0.05;
+    const PULSE_DEBOUNCE_MS = 1000;
+
+    let waveWindowMs = 30000;
+
+    let device, server, characteristic;
+    let boomOffset = -90, stickOffset = 135;
+    let currentBoomAngle = -90, currentStickAngle = 135;
+    let lastRawAngle = 0, autoCalibBase = 0;
+    let isCalibrating = false, isFirstDataPacket = true;
+
+    // States
+    let activityCount = 0, isCounterArmed = true;
+    let impactCount = 0;
+    let actThresh = 0, resThresh = 0, movThresh = 0, impThresh = 0;
+    let currentDelta = 0;
+
+    let lastTotalG = 1.0, currentVib = 0;
+    let totalWorkMs = 0, totalMovMs = 0;
+    let lastWorkTimestamp = 0, lastVibTimestamp = 0, lastFrameTimestamp = 0;
+    let isWorking = false, hasDeducted = false;
+    let isImpact = false, impactTimer = null;
+    let triggerPulse = false;
+    let lastPulseTimestamp = 0;
+
+    let effortSum = 0, effortStartAngle = 0;
+    let vibHistory = [];
+    let waveData = [];
+
+    // DOM
+    const dom = {
+        cStatus: document.getElementById('cStatus'), txtStatus: document.getElementById('txtStatus'), timerMov: document.getElementById('timerMov'),
+        cProd: document.getElementById('cProd'), txtCount: document.getElementById('txtCount'), timerWork: document.getElementById('timerWork'), badgeImp: document.getElementById('badgeImp'),
+        cHard: document.getElementById('cHard'), txtEffort: document.getElementById('txtEffort'), txtHardness: document.getElementById('txtHardness'),
+        connect: document.getElementById('connectBtn'), status: document.getElementById('connBadge'),
+        boom: document.getElementById('boom'), stick: document.getElementById('stick'),
+        alert: document.getElementById('alertBanner'),
+        leds: { b: document.getElementById('ledBoom'), s: document.getElementById('ledStick') },
+        fan: document.getElementById('engineFan'),
+        tCan: document.getElementById('threshCanvas'), wCan: document.getElementById('waveCanvas'),
+        scaleSel: document.getElementById('timeScale'), typeSel: document.getElementById('waveType'),
+        controlSel: document.getElementById('controlTarget'),
+        valBoom: document.getElementById('valBoom'), valStick: document.getElementById('valStick')
+    };
+
+    // --- SETUP ---
+    const actSelect = document.getElementById('actThresh');
+    const resSelect = document.getElementById('resThresh');
+    const movSelect = document.getElementById('movThresh');
+    const impSelect = document.getElementById('impThresh');
+
+    function populateDropdown(sel, start, end, step, suffix, def) {
+        for(let i=start; (step>0?i<=end:i>=end); i+=step) {
+            let opt = document.createElement('option');
+            let val = (i===0?"關閉 (OFF)":i.toFixed(Number.isInteger(step)?0:3));
+            opt.value = i; opt.innerText = val + suffix;
+            if(Math.abs(i-def)<0.001) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    }
+    populateDropdown(actSelect, 40, -40, -10, "°", -30);
+    populateDropdown(resSelect, 40, -40, -10, "°", -10);
+    
+    let optOff = document.createElement('option'); optOff.value=0; optOff.innerText="關閉 (OFF)";
+    movSelect.appendChild(optOff);
+    populateDropdown(movSelect, 0.003, 0.03, 0.003, "G", 0.003);
+    populateDropdown(impSelect, 1.5, 4.0, 0.5, "G", 2.5);
+
+    actSelect.onchange = updateThresh; resSelect.onchange = updateThresh;
+    movSelect.onchange = updateThresh; impSelect.onchange = updateThresh;
+    dom.scaleSel.onchange = () => { waveWindowMs = parseInt(dom.scaleSel.value); };
+    
+    function updateThresh() {
+        actThresh = parseInt(actSelect.value);
+        resThresh = parseInt(resSelect.value);
+        movThresh = parseFloat(movSelect.value);
+        impThresh = parseFloat(impSelect.value);
+        let badge = document.getElementById('counterState');
+        if(actThresh === 0) { badge.innerText="關閉"; badge.className="status-badge bg-gray"; }
+        else { badge.innerText = isCounterArmed ? "準備中" : "工作中"; badge.className = isCounterArmed ? "status-badge bg-green" : "status-badge bg-yellow"; }
+        drawThreshCanvas();
+    }
+
+    function updateEffortUI(val) {
+        dom.txtEffort.innerText = val.toFixed(0) + "%";
+        dom.cHard.className = "hud-circle circle-sm";
+        if (val < 25) { dom.cHard.classList.add('h-soft'); dom.txtHardness.innerText = "鬆軟"; }
+        else if (val < 50) { dom.cHard.classList.add('h-normal'); dom.txtHardness.innerText = "一般"; }
+        else if (val < 75) { dom.cHard.classList.add('h-hard'); dom.txtHardness.innerText = "堅硬"; }
+        else { dom.cHard.classList.add('h-extreme'); dom.txtHardness.innerText = "極硬"; }
+    }
+
+    function triggerImpact() {
+        if(isImpact) return; isImpact = true; impactCount++;
+        dom.badgeImp.innerText = "撞擊: "+impactCount;
+        dom.badgeImp.classList.add('show');
+        dom.cProd.classList.add('impact');
+        dom.alert.classList.add('show');
+        if(impactTimer) clearTimeout(impactTimer);
+        impactTimer = setTimeout(() => {
+            isImpact = false; dom.cProd.classList.remove('impact'); dom.alert.classList.remove('show');
+        }, 1000);
+    }
+
+    function updateTimerDisplay(el, ms) {
+        let s = Math.floor(ms / 1000); let m = Math.floor(s / 60); s %= 60;
+        let pad = (n) => n<10?'0'+n:n; el.innerText = `${pad(m)}:${pad(s)}`;
+    }
+
+    // --- CORE LOGIC (v12.0) ---
+    function updateAngles() {
+        const target = dom.controlSel.value;
+        if (target === 'boom') currentBoomAngle = lastRawAngle + boomOffset;
+        else currentStickAngle = lastRawAngle + stickOffset;
+        dom.valBoom.innerText = currentBoomAngle.toFixed(1) + "°";
+        dom.valStick.innerText = currentStickAngle.toFixed(1) + "°";
+    }
+
+    function renderExcavator() {
+        dom.boom.setAttribute('transform', `translate(${BOOM_PIVOT_X}, ${BOOM_PIVOT_Y}) rotate(${currentBoomAngle})`);
+        dom.stick.setAttribute('transform', `translate(${STICK_PIVOT_X}, ${STICK_PIVOT_Y}) rotate(${currentStickAngle})`);
+        document.getElementById('offB').innerText = boomOffset.toFixed(0);
+        document.getElementById('offS').innerText = stickOffset.toFixed(0);
+    }
+
+    // --- BLE & DATA ---
+    dom.connect.onclick = async () => {
+        if (!navigator.bluetooth) return alert("不支援藍牙");
+        try {
+            dom.status.innerText = "掃描中"; dom.status.className = "status-badge bg-blue";
+            device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+            device.addEventListener('gattserverdisconnected', onDisconnect);
+            dom.status.innerText = "連線中";
+            server = await device.gatt.connect();
+            service = await server.getPrimaryService(SERVICE_UUID);
+            characteristic = await service.getCharacteristic(CHAR_UUID);
+            await characteristic.startNotifications();
+            characteristic.addEventListener('characteristicvaluechanged', handleData);
+            
+            activityCount=0; dom.txtCount.innerText="0"; impactCount=0; dom.badgeImp.innerText="撞擊: 0";
+            totalWorkMs=0; totalMovMs=0; vibHistory=[]; waveData=[]; isFirstDataPacket=true;
+            lastFrameTimestamp = Date.now();
+            updateTimerDisplay(dom.timerWork, 0); updateTimerDisplay(dom.timerMov, 0);
+            updateThresh();
+
+            dom.status.innerText = "已連線"; dom.status.className = "status-badge bg-green";
+            dom.connect.innerText = "斷開連線"; dom.connect.className = "btn btn-danger";
+            requestAnimationFrame(timerLoop);
+        } catch(e) { console.log(e); onDisconnect(); }
+    };
+
+    function onDisconnect() {
+        dom.status.innerText="未連線"; dom.status.className="status-badge bg-gray";
+        dom.connect.innerText="掃描並連線"; dom.connect.className="btn btn-primary";
+        device = null;
+    }
+
+    function handleData(event) {
+        const dv = event.target.value;
+        const x = dv.getFloat32(0, true), y = dv.getFloat32(4, true), z = dv.getFloat32(8, true);
+        let deg = Math.atan2(y, z) * (180/Math.PI);
+        lastRawAngle = (deg + 360) % 360;
+
+        if(isFirstDataPacket) {
+            autoCalibBase = lastRawAngle; boomOffset = TARGET_BOOM - lastRawAngle; stickOffset = TARGET_STICK - lastRawAngle;
+            currentBoomAngle = lastRawAngle + boomOffset; currentStickAngle = lastRawAngle + stickOffset;
+            lastTotalG = Math.sqrt(x*x+y*y+z*z); isFirstDataPacket = false;
+        }
+
+        let delta = lastRawAngle - autoCalibBase;
+        if(delta > 180) delta -= 360; if(delta < -180) delta += 360;
+        currentDelta = delta;
+        document.getElementById('deltaDisplay').innerText = `Δ: ${delta.toFixed(0)}°`;
+
+        let totalG = Math.sqrt(x*x+y*y+z*z);
+        let vib = Math.abs(totalG - lastTotalG);
+        currentVib = vib; document.getElementById('valTotalG').innerText = totalG.toFixed(3)+"G";
+
+        if(totalG > impThresh) triggerImpact();
+
+        if(actThresh !== 0) {
+            const now = Date.now();
+            if(isCounterArmed) {
+                if((actThresh>0 && delta>actThresh) || (actThresh<0 && delta<actThresh)) {
+                    if (now - lastPulseTimestamp > PULSE_DEBOUNCE_MS) {
+                        activityCount++;
+                        dom.txtCount.innerText = activityCount;
+                        dom.txtCount.classList.remove('pop-active');
+                        void dom.txtCount.offsetWidth; // Force Reflow
+                        dom.txtCount.classList.add('pop-active');
+
+                        isCounterArmed = false; updateThresh();
+                        isWorking = true; lastWorkTimestamp = now; hasDeducted = false;
+                        effortSum = 0; effortStartAngle = currentBoomAngle;
+                        triggerPulse = true; lastPulseTimestamp = now;
+                    }
+                }
+            } else {
+                if((actThresh>0 && delta<resThresh) || (actThresh<0 && delta>resThresh)) {
+                    isCounterArmed = true; updateThresh();
+                }
+            }
+        }
+
+        if(isWorking) {
+            if(vib > NOISE_FLOOR) effortSum += (vib - NOISE_FLOOR);
+            if(Math.abs(delta) > 1.0) lastWorkTimestamp = Date.now();
+        }
+
+        if(vib > VIB_IDLE_TH) lastVibTimestamp = Date.now();
+        vibHistory.push({ t: Date.now(), v: vib });
+        lastTotalG = totalG;
+
+        if(!isCalibrating) { updateAngles(); renderExcavator(); }
+        drawThreshCanvas();
+    }
+
+    function timerLoop() {
+        const now = Date.now();
+        const dt = now - lastFrameTimestamp; lastFrameTimestamp = now;
+
+        if(device && device.gatt.connected) {
+            let isQuiet = (now - lastWorkTimestamp > QUICK_STOP_MS) && (now - lastVibTimestamp > QUICK_STOP_MS);
+
+            if(isWorking) {
+                if(!isQuiet) {
+                    totalWorkMs += dt;
+                    dom.leds.b.classList.value = "status-led led-on";
+                    dom.leds.s.classList.value = "status-led led-off";
+                } else {
+                    isWorking = false;
+                    let angleChange = Math.abs(currentBoomAngle - effortStartAngle);
+                    let val = (angleChange > 5) ? Math.min(100, (effortSum/angleChange)*500) : 0;
+                    updateEffortUI(val);
+                    if(!hasDeducted && totalWorkMs > 0) { totalWorkMs = Math.max(0, totalWorkMs - QUICK_STOP_MS); hasDeducted = true; }
+                }
+            } else {
+                dom.leds.b.classList.value = "status-led led-off";
+                dom.leds.s.classList.value = "status-led led-off";
+            }
+            updateTimerDisplay(dom.timerWork, totalWorkMs);
+
+            while(vibHistory.length>0 && (now-vibHistory[0].t > AVG_WINDOW_MS)) vibHistory.shift();
+            let sum=0; for(let i of vibHistory) sum+=i.v;
+            let avg = vibHistory.length ? sum/vibHistory.length : 0;
+            document.getElementById('avgVibVal').innerText = avg.toFixed(3);
+
+            let isMoving = (movThresh > 0 && avg > movThresh);
+            if(isMoving) {
+                totalMovMs += dt;
+                
+                dom.cStatus.classList.add('theme-green'); dom.cStatus.classList.remove('theme-gray');
+                dom.txtStatus.innerText = "運轉中";
+
+                dom.cProd.classList.add('theme-blue'); dom.cProd.classList.remove('theme-gray');
+                
+                // Fan Animation
+                dom.fan.classList.add('spin-fan');
+
+                if(isWorking && !isQuiet) { dom.cProd.classList.add('pulse-border'); }
+                else { dom.cProd.classList.remove('pulse-border'); }
+
+            } else {
+                dom.cStatus.classList.add('theme-gray'); dom.cStatus.classList.remove('theme-green');
+                dom.txtStatus.innerText = "靜止";
+                
+                dom.cProd.classList.add('theme-gray'); dom.cProd.classList.remove('theme-blue');
+                dom.cProd.classList.remove('pulse-border');
+                
+                // Stop Fan
+                dom.fan.classList.remove('spin-fan');
+            }
+            updateTimerDisplay(dom.timerMov, totalMovMs);
+
+            waveData.push({ t: now, avgVib: avg, curVib: currentVib, isMoving: isMoving, isWorking: isWorking, isImpact: isImpact, isTrigger: triggerPulse });
+            triggerPulse = false;
+            while(waveData.length>0 && (now-waveData[0].t > waveWindowMs)) waveData.shift();
+            
+            drawWaveCanvas();
+        }
+        requestAnimationFrame(timerLoop);
+    }
+
+    function drawThreshCanvas() {
+        const ctx = dom.tCan.getContext('2d');
+        if (dom.tCan.width !== dom.tCan.clientWidth) { dom.tCan.width = dom.tCan.clientWidth; dom.tCan.height = dom.tCan.clientHeight; }
+        const w = dom.tCan.width, h = dom.tCan.height;
+        const scale = w/100;
+        ctx.clearRect(0,0,w,h);
+        ctx.strokeStyle = "#eee"; ctx.beginPath();
+        for(let i=-50; i<=50; i+=10) { let x = (w/2)+(i*scale); ctx.moveTo(x,0); ctx.lineTo(x,h); }
+        ctx.stroke();
+        ctx.strokeStyle = "#333"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(w/2,0); ctx.lineTo(w/2,h); ctx.stroke();
+        if(actThresh!==0) {
+            let ax = (w/2)+(actThresh*scale); ctx.strokeStyle="#ef4444"; ctx.beginPath(); ctx.moveTo(ax,0); ctx.lineTo(ax,h); ctx.stroke();
+            let rx = (w/2)+(resThresh*scale); ctx.strokeStyle="#22c55e"; ctx.beginPath(); ctx.moveTo(rx,0); ctx.lineTo(rx,h); ctx.stroke();
+        }
+        let dx = (w/2)+(currentDelta*scale);
+        ctx.fillStyle = isCounterArmed ? "#3b82f6" : "#eab308";
+        ctx.globalAlpha = 0.6; ctx.fillRect(w/2, h/2-8, dx-(w/2), 16);
+    }
+
+    function drawWaveCanvas() {
+        const ctx = dom.wCan.getContext('2d');
+        if (dom.wCan.width !== dom.wCan.clientWidth) { dom.wCan.width = dom.wCan.clientWidth; dom.wCan.height = dom.wCan.clientHeight; }
+        const w = dom.wCan.width, h = dom.wCan.height;
+        const now = Date.now();
+        const type = dom.typeSel.value;
+
+        ctx.clearRect(0,0,w,h);
+        let totalSec = waveWindowMs / 1000;
+        let pxPerSec = w / totalSec;
+        ctx.strokeStyle = "#f3f4f6"; ctx.lineWidth = 1; ctx.beginPath();
+        for(let i=0; i <= totalSec; i++) { let x = w - (i * pxPerSec); ctx.moveTo(x,0); ctx.lineTo(x,h); }
+        ctx.stroke();
+
+        /* 1. MOVING (Green) */
+        ctx.beginPath(); ctx.moveTo(w, h); let first=true;
+        for(let i=waveData.length-1; i>=0; i--) {
+            let d = waveData[i], x = w - ((now - d.t) / waveWindowMs) * w;
+            if(x<0) break;
+            let y = h; if(d.isMoving) { y = h - (d.avgVib*500); if(y<h/2) y=h/2; }
+            if(first) { ctx.lineTo(x,y); first=false; } else ctx.lineTo(x,y);
+        }
+        ctx.lineTo(0, h); ctx.fillStyle = "#dcfce7"; ctx.fill();
+
+        /* 2. WORKING (Blue->Red) */
+        const barW = (w / (waveWindowMs/16)) + 1;
+        for(let i=0; i<waveData.length; i++) {
+            let d = waveData[i], x = w - ((now - d.t) / waveWindowMs) * w;
+            if(x<0) continue;
+            let shouldDraw = (type === 'all' && d.isWorking) || (type === 'simple' && d.isTrigger);
+            if(shouldDraw) {
+                let barH;
+                if(type === 'all') barH = d.curVib * 100; else barH = h * 0.6;
+                if(barH > h) barH = h;
+                
+                let factor = Math.min(1, d.curVib * 2);
+                let r = 59 + (239 - 59) * factor;
+                let g = 130 + (68 - 130) * factor;
+                let b = 246 + (68 - 246) * factor;
+                
+                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                let width = (type === 'simple') ? 4 : barW;
+                ctx.fillRect(x, h-barH, width, barH);
+            }
+            if(d.isImpact) { ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.moveTo(x,5); ctx.lineTo(x-4,0); ctx.lineTo(x+4,0); ctx.fill(); }
+        }
+    }
+
+    dom.connect.onmousedown=null;
+    calibrateBtn.onmousedown = () => { isCalibrating=true; document.body.classList.add('calibrating'); calibrateBtn.innerText="< 拖曳校正 >"; };
+    window.onmouseup = () => { if(isCalibrating) { isCalibrating=false; document.body.classList.remove('calibrating'); calibrateBtn.innerText="按住校正歸零"; }};
+    window.onmousemove = (e) => {
+        if(!isCalibrating) return;
+        const delta = e.movementX * 0.5;
+        const ctrl = dom.controlSel.value;
+        if(ctrl==='boom') boomOffset+=delta; else stickOffset+=delta;
+        updateAngles();
+        renderExcavator();
+    };
+    updateThresh();
+</script>
+</body>
+</html>
