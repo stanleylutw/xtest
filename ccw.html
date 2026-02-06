@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>GBLE Log Generator v2.1</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 30px; background: #f8fafc; color: #1e293b; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        h3 { margin-top: 0; color: #4f46e5; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        .config-group { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+        label { font-weight: 600; font-size: 14px; }
+        select { padding: 8px; width: 150px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; }
+        button { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #4338ca; }
+        #status { margin-top: 15px; font-size: 13px; text-align: center; color: #64748b; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h3>GBLE Realistic Log Generator</h3>
+    
+    <div class="config-group">
+        <label>Tilt Angle (傾斜):</label>
+        <select id="tilt">
+            <option value="0">0° (Horizontal)</option>
+            <option value="30">30°</option>
+            <option value="45" selected>45° (Default)</option>
+        </select>
+    </div>
+
+    <div class="config-group">
+        <label>RPM (轉速):</label>
+        <select id="rpm">
+            <option value="5">5 RPM</option>
+            <option value="10" selected>10 RPM (Default)</option>
+            <option value="15">15 RPM</option>
+        </select>
+    </div>
+
+    <div class="config-group">
+        <label>Laps (圈數):</label>
+        <select id="laps">
+            <option value="3">3 Laps</option>
+            <option value="10" selected>10 Laps (Default)</option>
+            <option value="20">20 Laps</option>
+        </select>
+    </div>
+
+    <button onclick="runGenerator()">Generate CW & CCW Logs</button>
+    <div id="status">Ready to generate.</div>
+</div>
+
+<script>
+function runGenerator() {
+    const tiltDeg = parseInt(document.getElementById('tilt').value);
+    const rpm = parseInt(document.getElementById('rpm').value);
+    const laps = parseInt(document.getElementById('laps').value);
+    const status = document.getElementById('status');
+    
+    status.innerText = "Generating logs...";
+    status.style.color = "#4f46e5";
+
+    const freq = 50;
+    const interval = 20;
+    const secPerLap = 60 / rpm;
+    const totalSamples = Math.floor(secPerLap * laps * freq);
+    const noiseLevel = 0.04;
+
+    // 物理分解物理公式
+    const tiltRad = (tiltDeg * Math.PI) / 180;
+    const xStatic = Math.sin(tiltRad);
+    const amplitude = Math.cos(tiltRad);
+
+    function getNoise() { return (Math.random() - 0.5) * 2 * noiseLevel; }
+
+    function createContent(direction) {
+        let log = "[GBLE_LOG_START]\n";
+        log += `# Header: ${direction}, Tilt:${tiltDeg}deg, RPM:${rpm}, Laps:${laps}\n`;
+        let currentTime = new Date();
+        currentTime.setHours(12, 0, 0, 0);
+
+        for (let i = 0; i < totalSamples; i++) {
+            let t_sec = i / freq;
+            let angle = (t_sec / secPerLap) * 2 * Math.PI;
+
+            if (i % (secPerLap * freq) === 0) {
+                log += `# --- Round ${Math.floor(i/(secPerLap * freq)) + 1} Start ---\n`;
+            }
+
+            let x = xStatic + getNoise();
+            // CCW logic: Y leads Z (+sin); CW logic: Y lags Z (-sin)
+            let yBase = direction === 'CW' ? Math.sin(angle) : -Math.sin(angle);
+            let zBase = Math.cos(angle);
+
+            let y = (yBase * amplitude) + getNoise();
+            let z = (zBase * amplitude) + getNoise();
+            
+            let totalG = Math.sqrt(x*x + y*y + z*z).toFixed(3);
+            let ts = `[${currentTime.toTimeString().split(' ')[0]}.${String(currentTime.getMilliseconds()).padStart(3, '0')}]`;
+            
+            log += `${ts} X:${x.toFixed(3)} Y:${y.toFixed(3)} Z:${z.toFixed(3)} | T:${totalG}G\n`;
+            currentTime.setMilliseconds(currentTime.getMilliseconds() + interval);
+        }
+        log += "[GBLE_LOG_END]";
+        return log;
+    }
+
+    function download(filename, content) {
+        let blob = new Blob([content], {type: "text/plain"});
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+    }
+
+    // 下載兩份檔案
+    const cw = createContent('CW');
+    download(`CW_T${tiltDeg}_R${rpm}_L${laps}.txt`, cw);
+    
+    setTimeout(() => {
+        const ccw = createContent('CCW');
+        download(`CCW_T${tiltDeg}_R${rpm}_L${laps}.txt`, ccw);
+        status.innerText = "Success! Both files downloaded.";
+        status.style.color = "#16a34a";
+    }, 800);
+}
+</script>
+
+</body>
+</html>
